@@ -74,7 +74,7 @@ struct expression
 		pointer(0),
 		op(a.op)
 	{
-		cout << "Here!" << endl;
+		//cout << "Here!" << endl;
 	}
 };
 

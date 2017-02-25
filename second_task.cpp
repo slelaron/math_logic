@@ -272,6 +272,7 @@ struct exist: unary_operation
 	unsigned long long hash()
 	{
 		unsigned long long h = ('?' * A) % INF + '(';
+		h = ((h * bin_pow(A, var->length())) % INF + var->hash()) % INF;
 		h = ((h * bin_pow(A, nxt->length())) % INF + nxt->hash()) % INF;
 		h = ((h * A) % INF + ')') % INF;
 		return h;
@@ -286,6 +287,10 @@ struct exist: unary_operation
 	}
 	operation* get_copy(vector <operation*>& ops)
 	{
+		if (ops.size() == 2)
+		{
+			return new exist(new variable(ops[0]->print()), ops[1]);
+		}
 		return new exist(var, ops[0]);
 	}
 };
@@ -307,6 +312,7 @@ struct every: unary_operation
 	unsigned long long hash()
 	{
 		unsigned long long h = ('@' * A) % INF + '(';
+		h = ((h * bin_pow(A, var->length())) % INF + var->hash()) % INF;
 		h = ((h * bin_pow(A, nxt->length())) % INF + nxt->hash()) % INF;
 		h = ((h * A) % INF + ')') % INF;
 		return h;
@@ -321,6 +327,10 @@ struct every: unary_operation
 	}
 	operation* get_copy(vector <operation*>& ops)
 	{
+		if (ops.size() == 2)
+		{
+			return new every(new variable(ops[0]->print()), ops[1]);
+		}
 		return new every(var, ops[0]);
 	}
 };
@@ -444,12 +454,16 @@ struct func_predicate: operation
 	func_predicate(string& _name, vector <operation*>& ops):
 		name(_name), operations(ops)
 	{}
-	string print()
+	virtual string print()
 	{
+		if (operations.size() == 0)
+		{
+			return name;
+		}
 		string now = name + "(";
 		for (int i = 0; i < (int)operations.size() - 1; i++)
 		{
-			now += operations[i]->print() + ", ";
+			now += operations[i]->print() + ",";
 		}
 		if (operations.size() > 0)
 		{
@@ -467,7 +481,7 @@ struct func_predicate: operation
 		}
 		return now;
 	}
-	unsigned long long hash()
+	virtual unsigned long long hash()
 	{
 		unsigned long long now = get_string_hash(name);
 		for (size_t i = 0; i < operations.size(); i++)
@@ -536,12 +550,22 @@ operation* get_term();
 
 variable* get_variable()
 {
+	bool subst = false;
+	if (to_parse[nxt] == '_')
+	{
+		nxt++;
+		subst = true;
+	}
 	string name = "";
 	name += to_parse[nxt];
 	nxt++;
 	for (; nxt < to_parse.size() && '0' <= to_parse[nxt] && to_parse[nxt] <= '9'; nxt++)
 	{
 		name += to_parse[nxt];
+	}
+	if (subst)
+	{
+		return new substitution(name);
 	}
 	return new variable(name);
 }
@@ -597,10 +621,11 @@ operation* get_multiplied()
 operation* get_summand()
 {
 	operation* tmp = get_multiplied();
-	if (nxt < to_parse.size() && to_parse[nxt] == '*')
+	while (nxt < to_parse.size() && to_parse[nxt] == '*')
 	{
 		nxt++;
-		return new multiplied(tmp, get_summand());
+		operation* snd = get_multiplied();
+		tmp = new multiplied(tmp, snd);
 	}
 	return tmp;
 }
@@ -608,10 +633,11 @@ operation* get_summand()
 operation* get_term()
 {
 	operation* tmp = get_summand();
-	if (nxt < to_parse.size() && to_parse[nxt] == '+')
+	while (nxt < to_parse.size() && to_parse[nxt] == '+')
 	{
 		nxt++;
-		return new summand(tmp, get_term());
+		operation* snd = get_summand();
+		tmp = new summand(tmp, snd);
 	}
 	return tmp;
 }
@@ -628,13 +654,16 @@ operation* get_predicate()
 			name += to_parse[nxt];
 		}
 		vector <operation*> terms;
-		while (nxt < to_parse.size() && to_parse[nxt] != ')')
+		if (to_parse[nxt] == '(')
 		{
+			while (nxt < to_parse.size() && to_parse[nxt] != ')')
+			{
+				nxt++;
+				operation* tmp = get_term();
+				terms.push_back(tmp);
+			}
 			nxt++;
-			operation* tmp = get_term();
-			terms.push_back(tmp);
 		}
-		nxt++;
 		return new predicate(name, terms);
 	}
 	operation* tmp1 = get_term();
@@ -703,10 +732,11 @@ operation* get_unary()
 operation* get_conjunction()
 {
 	operation* tmp = get_unary();
-	if (nxt < to_parse.size() && to_parse[nxt] == '&')
+	while (nxt < to_parse.size() && to_parse[nxt] == '&')
 	{
 		nxt++;
-		return new conjunction(tmp, get_unary());
+		operation* snd = get_unary();
+		tmp = new conjunction(tmp, snd);
 	}
 	return tmp;
 }
@@ -714,10 +744,11 @@ operation* get_conjunction()
 operation* get_disjunction()
 {
 	operation* tmp = get_conjunction();
-	if (nxt < to_parse.size() && to_parse[nxt] == '|')
+	while (nxt < to_parse.size() && to_parse[nxt] == '|')
 	{
 		nxt++;
-		return new disjunction(tmp, get_disjunction());
+		operation* snd = get_conjunction();
+		tmp = new disjunction(tmp, snd);
 	}
 	return tmp;
 }
@@ -771,12 +802,35 @@ operation* get_exp(const string& str)
 	return get_expression();
 }
 
+operation* get_exp(const string& str, int)
+{
+	size_t buf = nxt;
+	close_bracket.clear();
+	nxt = buf;
+	build_nxt();
+	nxt = buf;
+	return get_expression();
+}
+
 extern string scheme_axioms[];
 extern string axioms[];
+
+enum error_verdict
+{
+	NOTHING,
+	NOT_FREE_TO_SUBSTITUTE,
+	FREE_ENTRY,
+	FREE_IN_ASSUMPTION
+};
+
+error_verdict global_error;
 
 vector <unsigned long long> for_hash;
 vector <unsigned long long> for_hash_axiom;
 map <unsigned long long, unsigned long long> mp_hash;
+
+
+set <unsigned long long> assumptions_free_variables;
 
 bool check_on_assumption(operation* for_check, operation* assumption)
 {
@@ -878,13 +932,16 @@ void dfs3(operation* op, unsigned long long that)
 	}
 	else if (op->get_id() == 5 || op->get_id() == 6)
 	{
-		in_quantifier.push_back(op->get_nxt(0));
-		dfs3(op->get_nxt(1), that);
-		if (quantifier_pointer == in_quantifier.size())
+		if (op->get_nxt(0)->hash() != that)
 		{
-			quantifier_pointer--;
+			in_quantifier.push_back(op->get_nxt(0));
+			dfs3(op->get_nxt(1), that);
+			if (quantifier_pointer == in_quantifier.size())
+			{
+				quantifier_pointer--;
+			}
+			in_quantifier.pop_back();
 		}
-		in_quantifier.pop_back();
 	}
 	else
 	{
@@ -930,6 +987,10 @@ bool dfs5(operation* op)
 
 bool check_on_free(operation* op, vector <operation*>& res)
 {
+	if (res.size() == 0)
+	{
+		return true;
+	}
 	for_dfs5.clear();
 	for (size_t i = 0; i < res.size(); i++)
 	{
@@ -970,17 +1031,18 @@ bool check_on_axiom_11_12(operation* for_check, bool which)
 		}
 		operation* smth = get_something(that, right, var->hash());
 		take_quantifier_vars(that, var->hash());
-		if (!check_on_free(smth, res_quantifier))
-		{
-			return false;
-		}
 		vector <pair <operation*, operation*> > sub;
 		sub.push_back(make_pair(var, smth));
 		unique_ptr <operation> check(substitute(that, sub));
 		if (check->hash() != right->hash())
 		{
 			return false;
-		}	 
+		}
+		if (!check_on_free(smth, res_quantifier))
+		{
+			global_error = NOT_FREE_TO_SUBSTITUTE;
+			return false;
+		}
 	}
 	return true;
 }
@@ -1071,9 +1133,16 @@ void dfs1(operation* op)
 {
 	if (op->get_id() == 5 || op->get_id() == 6)
 	{
-		hash_set.insert(op->get_nxt(0)->hash());
+		bool truth = hash_set.find(op->get_nxt(0)->hash()) == hash_set.end();
+		if (truth)
+		{
+			hash_set.insert(op->get_nxt(0)->hash());
+		}
 		dfs1(op->get_nxt(1));
-		hash_set.erase(op->get_nxt(0)->hash());
+		if (truth)
+		{
+			hash_set.erase(op->get_nxt(0)->hash());
+		}
 	}
 	else if (op->get_id() == 0)
 	{
@@ -1096,6 +1165,7 @@ bool check_on_unfreedom(operation* for_check, vector <operation*>& var)
 	freedom_hash.clear();
 	hash_set.clear();
 	dfs1(for_check);
+	
 	for (size_t i = 0; i < var.size(); i++)
 	{
 		if (freedom_hash.find(var[i]->hash()) != freedom_hash.end())
@@ -1115,6 +1185,11 @@ operation* check_on_every(operation* for_check)
 		if (right->get_id() == 6)
 		{
 			operation* var = right->get_nxt(0);
+			if (assumptions_free_variables.find(var->hash()) != assumptions_free_variables.end())
+			{
+				global_error = FREE_IN_ASSUMPTION;
+				return nullptr;
+			}
 			operation* nxt = right->get_nxt(1);
 			vector <operation*> that;
 			that.push_back(var);
@@ -1122,6 +1197,11 @@ operation* check_on_every(operation* for_check)
 			{
 				return new consequence(left, nxt);
 			}
+			else
+			{
+				global_error = FREE_ENTRY;
+			}
+			//cerr << "Something bad here" << endl;
 		}
 	}
 	return nullptr;
@@ -1136,12 +1216,22 @@ operation* check_on_exist(operation* for_check)
 		if (left->get_id() == 5)
 		{
 			operation* var = left->get_nxt(0);
+			if (assumptions_free_variables.find(var->hash()) != assumptions_free_variables.end())
+			{
+				global_error = FREE_IN_ASSUMPTION;
+				return nullptr;
+			}
 			operation* nxt = left->get_nxt(1);
 			vector <operation*> that;
 			that.push_back(var);
 			if (check_on_unfreedom(right, that))
 			{
+				//cout << right->print() << endl;
 				return new consequence(nxt, right);
+			}
+			else
+			{
+				global_error = FREE_ENTRY;
 			}
 		}
 	}
@@ -1158,9 +1248,21 @@ operation* dfs4(operation* op)
 	}
 	else if (op->get_id() == 5 || op->get_id() == 6)
 	{
-		vector <operation*> ops;
-		ops.push_back(dfs4(op->get_nxt(1)));
-		return op->get_copy(ops);
+		if (op->get_nxt(0)->get_id() == 13 && sub.find(op->hash()) != sub.end())
+		{
+			vector <operation*> ops;
+			for (size_t i = 0; op->get_nxt(i) != nullptr; i++)
+			{
+				ops.push_back(dfs4(op->get_nxt(i)));
+			}
+			return op->get_copy(ops);
+		}
+		else
+		{
+			vector <operation*> ops;
+			ops.push_back(dfs4(op->get_nxt(1)));
+			return op->get_copy(ops);
+		}
 	}
 	else
 	{
@@ -1197,18 +1299,6 @@ string theorems_1[] = {"_a->_a->_a", "_a->(_a->_a)->_a", "(_a->(_a->_a))->(_a->(
 string theorems_2[] = {/*"_a->(_b->_c)", "_a->_b", */"(_a->_b)->(_a->(_b->_c))->(_a->_c)",
 					"(_a->(_b->_c))->(_a->_c)", "_a->_c"};
 
-
-string evidence_every[98];
-string evidence_exist[106];
-
-void delete_objects(vector <pair <operation*, operation*> >& smth)
-{
-	for (size_t i = 0; i < smth.size(); i++)
-	{
-		delete smth[i].first;
-	}
-}
-
 enum verdict
 {
 	MODUS_PONANS,
@@ -1220,7 +1310,51 @@ enum verdict
 	ERROR
 };
 
+string evidence_every[98];
+string evidence_exist[106];
+pair <verdict, pair <size_t, size_t> > result_every[98];
+pair <verdict, pair <size_t, size_t> > result_exist[106];
+
+void delete_objects(vector <pair <operation*, operation*> >& smth)
+{
+	for (size_t i = 0; i < smth.size(); i++)
+	{
+		delete smth[i].first;
+	}
+}
+
 size_t new_position[maxN];
+
+void run_result(vector <pair <verdict, pair <size_t, size_t> > >& result, bool another, size_t ass_number)
+{
+	size_t length = 98;
+	pair <verdict, pair <size_t, size_t> >* pointer = result_every;
+	if (another)
+	{
+		length = 106;
+		pointer = result_exist;
+	}
+	size_t to_add = result.size();
+	for (size_t i = 0; i < length; i++)
+	{
+		if (pointer[i].first == ASSUMPTION)
+		{
+			result.push_back(result[ass_number]);
+		}
+		else if (pointer[i].first == MODUS_PONANS)
+		{
+			result.push_back(make_pair(pointer[i].first, make_pair(pointer[i].second.first + to_add, pointer[i].second.second + to_add)));
+		}
+		else if (pointer[i].first == EVERY || pointer[i].first == EXIST)
+		{
+			result.push_back(make_pair(pointer[i].first, make_pair(pointer[i].second.first + to_add, pointer[i].second.second)));
+		}
+		else
+		{
+			result.push_back(pointer[i]);
+		}
+	}
+}
 
 void deduction_theorem(vector <operation*>& evidence,
 					vector <pair <verdict, pair <size_t, size_t> > >& result,
@@ -1228,16 +1362,18 @@ void deduction_theorem(vector <operation*>& evidence,
 					vector <pair <verdict, pair <size_t, size_t> > >& result1,
 					operation* formula)
 {
-	cerr << "Hello!" << endl;
+	//cerr << "Hello!" << endl;
 	for (size_t i = 0; i < evidence1.size(); i++)
 	{
 		delete evidence1[i];
 	}
 	evidence1.clear();
 	result1.clear();
+	//cerr << "Evidence " << evidence.size() << ' ' << "Result " << result.size() << endl;
 	assert(evidence.size() == result.size());
 	for (size_t i = 0; i < evidence.size(); i++)
 	{
+		//cerr << "Deduction theorem " << i << endl;
 		if (result[i].first == MODUS_PONANS)
 		{
 			vector <pair <operation*, operation*> > ops;
@@ -1256,6 +1392,7 @@ void deduction_theorem(vector <operation*>& evidence,
 		}
 		else if (result[i].first == EVERY)
 		{
+			run_result(result1, false, new_position[result[i].second.first]);
 			//TODO
 			vector <pair <operation*, operation*> > ops;
 			ops.push_back(make_pair(new substitution("a"), formula));
@@ -1270,6 +1407,7 @@ void deduction_theorem(vector <operation*>& evidence,
 		}
 		else if (result[i].first == EXIST)
 		{
+			run_result(result1, true, new_position[result[i].second.first]);
 			//TODO
 			vector <pair <operation*, operation*> > ops;
 			ops.push_back(make_pair(new substitution("a"), formula));
@@ -1300,6 +1438,10 @@ void deduction_theorem(vector <operation*>& evidence,
 		}
 		else if (result[i].first == AXIOM_SCHEME || result[i].first == AXIOM || result[i].first == ASSUMPTION)
 		{
+			// Check everything here
+
+			//
+			
 			evidence1.push_back(evidence[i]->copy_yourself());
 			unique_ptr <operation> res(get_exp(scheme_axioms[0]));
 			vector <pair <operation*, operation*> > ops;
@@ -1325,7 +1467,6 @@ vector <pair <verdict, pair <size_t, size_t> > > result1;
 vector <pair <size_t, size_t> > modus;
 
 vector <operation*> every_evidence;
-vector <pair <verdict, pair <size_t, size_t> > > every_result;
 vector <operation*> exist_evidence;
 vector <pair <verdict, pair <size_t, size_t> > > exist_result;
 
@@ -1334,7 +1475,7 @@ map <unsigned long long, pair <size_t, size_t> > mp_evidence;
 map <unsigned long long, pair <size_t, size_t> > wait_to_activate;
 map <unsigned long long, size_t> set_evidence;
 vector <vector <unsigned long long> > storage;
-map <unsigned long, size_t> mp_assumption;
+map <unsigned long long, size_t> mp_assumption;
 
 void check_evidence(vector <operation*>& evidence, vector <operation*>& assumption, vector <pair <verdict, pair <size_t, size_t> > >& result)
 {
@@ -1350,7 +1491,45 @@ void check_evidence(vector <operation*>& evidence, vector <operation*>& assumpti
 	
 	for (size_t i = 0; i < evidence.size(); i++)
 	{
-		cerr << "We are on " << i << endl;
+		global_error = NOTHING;
+		if (mp_assumption.find(evidence[i]->hash()) != mp_assumption.end())
+		{
+			//cerr << "Checker 3" << endl;
+			result.push_back(make_pair(ASSUMPTION, make_pair(mp_assumption[evidence[i]->hash()], -1)));
+		}
+		else if (check_all_scheme_axioms(evidence[i]))
+		{
+			//cerr << "Checker 4" << endl;
+			result.push_back(make_pair(AXIOM_SCHEME, make_pair(check_all_scheme_axioms(evidence[i]), -1)));
+		}
+		else if (check_all_axioms(evidence[i]))
+		{
+			//cerr << "Checker 5" << endl;
+			result.push_back(make_pair(AXIOM, make_pair(check_all_axioms(evidence[i]), -1)));
+		}
+		else if (mp_evidence.find(evidence[i]->hash()) != mp_evidence.end())
+		{
+			//cerr << "Checker 6" << endl;
+			unsigned long long hash = evidence[i]->hash();
+			result.push_back(make_pair(MODUS_PONANS, make_pair(mp_evidence[hash].first, mp_evidence[hash].second)));
+		}
+		else if (check_on_every(evidence[i]) != nullptr && set_evidence.find(check_on_every(evidence[i])->hash()) != set_evidence.end())
+		{
+			//cerr << "Checker 7" << endl;
+			result.push_back(make_pair(EVERY, make_pair(set_evidence[check_on_every(evidence[i])->hash()], -1)));
+		}
+		else if (check_on_exist(evidence[i]) != nullptr && set_evidence.find(check_on_exist(evidence[i])->hash()) != set_evidence.end())
+		{
+			//cerr << "Checker 8" << endl;
+			result.push_back(make_pair(EXIST, make_pair(set_evidence[check_on_exist(evidence[i])->hash()], -1)));
+		}
+		else
+		{
+			//cerr << "Checker 9" << endl;
+			result.push_back(make_pair(ERROR, make_pair(global_error, -1)));
+		}
+
+		
 		if (evidence[i]->get_id() == 1)
 		{
 			unsigned long long hash = evidence[i]->get_nxt(0)->hash();
@@ -1384,36 +1563,7 @@ void check_evidence(vector <operation*>& evidence, vector <operation*>& assumpti
 			}
 		}
 		set_evidence[hash] = i;
-		
-		if (mp_assumption.find(evidence[i]->hash()) != mp_assumption.end())
-		{
-			result.push_back(make_pair(ASSUMPTION, make_pair(mp_assumption[evidence[i]->hash()], -1)));
-		}
-		else if (check_all_scheme_axioms(evidence[i]))
-		{
-			result.push_back(make_pair(AXIOM_SCHEME, make_pair(check_all_scheme_axioms(evidence[i]), -1)));
-		}
-		else if (check_all_axioms(evidence[i]))
-		{
-			result.push_back(make_pair(AXIOM, make_pair(check_all_axioms(evidence[i]), -1)));
-		}
-		else if (mp_evidence.find(evidence[i]->hash()) != mp_evidence.end())
-		{
-			unsigned long long hash = evidence[i]->hash();
-			result.push_back(make_pair(MODUS_PONANS, make_pair(mp_evidence[hash].first, mp_evidence[hash].second)));
-		}
-		else if (check_on_every(evidence[i]) != nullptr && set_evidence.find(check_on_every(evidence[i])->hash()) != set_evidence.end())
-		{
-			result.push_back(make_pair(EVERY, make_pair(set_evidence[check_on_every(evidence[i])->hash()], -1)));
-		}
-		else if (check_on_exist(evidence[i]) != nullptr && set_evidence.find(check_on_exist(evidence[i])->hash()) != set_evidence.end())
-		{
-			result.push_back(make_pair(EXIST, make_pair(set_evidence[check_on_exist(evidence[i])->hash()], -1)));
-		}
-		else
-		{
-			result.push_back(make_pair(ERROR, make_pair(-1, -1)));
-		}
+		//cerr << "Done" << endl;
 	}
 }
 
@@ -1433,10 +1583,10 @@ void get_verdict(vector <pair <verdict, pair <size_t, size_t> > >& result)
 				cout << "Axiom scheme " << result[i].second.first << endl;
 				break;
 			case EVERY:
-				cout << "M.P. every " << result[i].second.first + 1 << endl;
+				cout << "Every " << result[i].second.first + 1 << endl;
 				break;
 			case EXIST:
-				cout << "M.P. exist " << result[i].second.first + 1 << endl;
+				cout << "Exist " << result[i].second.first + 1 << endl;
 				break;
 			case ERROR:
 				cout << "Error" << endl;
@@ -1454,7 +1604,20 @@ bool check_verdict(vector <pair <verdict, pair <size_t, size_t> > >& result)
 	{
 		if (result[i].first == ERROR)
 		{
-			cout << "Ошибка в строчке с номером " << i << endl;
+			cout << "Вывод некорректен, начиная с формулы " << i + 1 << ' ';
+			switch (result[i].second.first)
+			{
+				case FREE_ENTRY:
+					cout << "[Переменная свободно входит в формулу при применении правил для любого и существует]" << endl;
+					break;
+				case FREE_IN_ASSUMPTION:
+					cout << "[Используется правило с квантором по переменной, которая свободно входит в допущение]" << endl;
+					break;
+				case NOT_FREE_TO_SUBSTITUTE:
+					cout << "[Терм не свободен для подстановки вместо переменной]";
+					break;
+			}
+			cout << endl;
 			return false;
 		}
 	}
@@ -1463,26 +1626,67 @@ bool check_verdict(vector <pair <verdict, pair <size_t, size_t> > >& result)
 
 void get_every()
 {
-	FILE* input = freopen("for_every", "r", stdin);
+	ifstream input;
+	input.open("for_every");
 
 	for (int i = 0; i < 98; i++)
 	{
-		cin >> evidence_every[i];
+		input >> evidence_every[i];
 	}
 
-	fclose(input);
+	input.close();
+	
+	ifstream in;
+	in.open("comment_for_every");
+
+	for (size_t i = 0; i < 98; i++)
+	{
+		long long a, b, c;
+		in >> a >> b >> c;
+		result_every[i] = make_pair((verdict)a, make_pair((size_t)b, (size_t)c));
+	}
+
+	in.close();
+}
+
+void take_free_variables_from_assumptions()
+{
+	for (size_t i = 0; i < assumption.size(); i++)
+	{
+		freedom_hash.clear();
+		hash_set.clear();
+		dfs1(assumption[i]);
+
+		for (unsigned long long hash: freedom_hash)
+		{
+			assumptions_free_variables.insert(hash);
+		}
+	}
 }
 
 void get_exist()
 {
-	FILE* input = freopen("for_exist", "r", stdin);
+	ifstream input;
+	input.open("for_exist");
 
 	for (int i = 0; i < 106; i++)
 	{
-		cin >> evidence_exist[i];
+		input >> evidence_exist[i];
 	}
 
-	fclose(input);
+	input.close();
+
+	ifstream in;
+	in.open("comment_for_exist");
+
+	for (size_t i = 0; i < 98; i++)
+	{
+		long long a, b, c;
+		in >> a >> b >> c;
+		result_exist[i] = make_pair((verdict)a, make_pair((size_t)b, (size_t)c));
+	}
+
+	in.close();
 }
 
 int main()
@@ -1497,82 +1701,92 @@ int main()
 
 	string s;
 	cin >> s;
-	string last;
-	size_t ptr = 0;
-	bool was = false;
-	for (; ptr < s.size();)
+
+	string last = "";
+	string previous = "";
+	int pos = (int)s.size() - 1;
+	for (; pos >= 2 && (s[pos - 1] != '-' || s[pos - 2] != '|'); pos--);
+	for (int i = 0; i < pos - 2; i++)
 	{
-		string tmp = "";
-		while (ptr < s.size() && s[ptr] != ',' && (s[ptr] != '|' || s[ptr + 1] != '-'))
+		previous += s[i];
+	}
+	for (size_t i = pos; i < s.size(); i++)
+	{
+		last += s[i];
+	}
+	//cout << previous << ' ' << last << endl;
+	nxt = 0;
+	to_parse = previous;
+	while (nxt < previous.size())
+	{
+		operation* op = get_exp(previous, 0);
+		//cout << op->print() << endl; 
+		assumption.push_back(op);
+		if (previous[nxt] == ',')
 		{
-			tmp += s[ptr++];
-		}
-		if (tmp.size() > 0)
-		{
-			if (!was)
-			{
-				assumption.push_back(get_exp(tmp));
-			}
-			else
-			{
-				last = tmp;
-			}
-		}
-		if (ptr < s.size() && s[ptr] == '|' && s[ptr + 1] == '-')
-		{
-			ptr += 2;
-			was = true;
-		}
-		else if (ptr < s.size() && s[ptr] == ',')
-		{
-			ptr++;
+			//cout << "Stop " << nxt << endl;
+			nxt++;
 		}
 	}
-	unsigned long long last_hash = get_exp(last)->hash();
-	size_t where_I_am = 0;
+	//for (size_t i = 0; i < assumption.size(); i++)
+	//{
+		//cout << assumption[i]->print() << endl;
+	//}
+	unique_ptr <operation> last_operation(get_exp(last));
+	//cout << last_operation->print() << endl;
+	unsigned long long last_hash = last_operation->hash();
+	//size_t where_I_am = 0;
 	do
 	{
-		cerr << where_I_am << endl;
 		cin >> s;
 		evidence.push_back(get_exp(s));
-		cerr << "End of " << where_I_am++ << endl;
+		//cerr << "Scanning " << where_I_am++ << endl;
 	} while (evidence[evidence.size() - 1]->hash() != last_hash);
 
+	take_free_variables_from_assumptions();
+
 	//cerr << "Hello!" << endl;
-	//cout << "\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\";
+	//cout << "\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\n";
 
 	//for (size_t i = 0; i < evidence.size(); i++)
 	//{
 		//cout << evidence[i]->print() << endl;
 	//}
 
-	//cout << "\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\";
+	//cout << "\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\n";
 
-	cerr << "Enter" << endl;
+	cerr << "Start checking" << endl;
 	
 	check_evidence(evidence, assumption, result);
 
-	cerr << "Down" << endl;
+	cerr << "Checked" << endl;
 
 	bool what_to_do = check_verdict(result);
 
 	//cerr << get_exp("@a@b@c((a=b)->((a=c)->(b=c)))")->hash() << ' ' << get_exp("@a@b@c((b=a)->((a=c)->(b=c)))")->hash() << endl;
 	//cerr << get_exp("a=b")->hash() << ' ' << get_exp("b=a")->hash() << endl;
 
+	 get_verdict(result);
+
+	//cout << '\n';
+
 	if (what_to_do)
 	{
-		for (size_t i = 0; i < assumption.size(); i++)
+		for (int i = (int)assumption.size() - 1; i >= 0; i--)
 		{
-			cerr << i << endl;
+			//cerr << i << endl;
 			deduction_theorem(evidence, result, evidence1, result1, assumption[i]);
 			swap(result, result1);
 			swap(evidence, evidence1);
 		}
 		for (size_t i = 0; i < evidence.size(); i++)
 		{
+			//cerr << "Printing " << i << endl;
 			cout << evidence[i]->print() << endl;
 		}
 	}
+
+	//get_verdict(result);
 	//cerr << "Good!" << endl;
 
 	for (size_t i = 0; i < evidence.size(); i++)

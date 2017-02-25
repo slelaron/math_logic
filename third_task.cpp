@@ -3,31 +3,33 @@
 
 using namespace std;
 
-string prelude[266];
+string prelude[269];
 string some_theorem[71];
 
 void get_prelude()
 {
-	FILE* input = freopen("another_change", "r", stdin);
+	ifstream in;
+	in.open("another_change");
 
-	for (int i = 0; i < 266; i++)
+	for (int i = 0; i < 269; i++)
 	{
-		cin >> prelude[i];
+		in >> prelude[i];
 	}
 
-	fclose(input);
+	in.close();
 }
 
 void get_some_theorem()
 {
-	FILE* input = freopen("some_theorem", "r", stdin);
+	ifstream in;
+	in.open("some_theorem");
 
 	for (int i = 0; i < 71; i++)
 	{
-		cin >> some_theorem[i];
+		in >> some_theorem[i];
 	}
 
-	fclose(input);
+	in.close();
 }
 
 string get_null(int a)
@@ -76,7 +78,7 @@ void get_evidence(const string& s, vector <string>& to_add)
 
 void make_something_good(int a, int b)
 {
-	for (int i = 0; i < 266; i++)
+	for (int i = 0; i < 269; i++)
 	{
 		cout << prelude[i] << '\n';
 	}
@@ -148,7 +150,7 @@ void make_something_good(int a, int b)
 
 void make_something_bad(int a, int b)
 {
-	for (int i = 0; i < 266; i++)
+	for (int i = 0; i < 269; i++)
 	{
 		cout << prelude[i] << '\n';
 	}
@@ -227,7 +229,6 @@ int main()
 {
 	get_prelude();
 	get_some_theorem();
-	FILE* input = freopen("input", "r", stdin);
 	FILE* output = freopen("output", "w", stdout);
 	
 	int a, b;
@@ -243,7 +244,6 @@ int main()
 		make_something_bad(a, b);
 	}
 
-	fclose(input);
 	fclose(output);
 	return 0;
 }

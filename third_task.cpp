@@ -225,11 +225,18 @@ void make_something_bad(int a, int b)
 	cout << "!?p(" << ans << ")\n";
 }
 
+//#define Debug
+
 int main()
 {
 	get_prelude();
 	get_some_theorem();
-	//FILE* output = freopen("output", "w", stdout);
+
+	#ifdef Debug
+	
+	FILE* output = freopen("output", "w", stdout);
+
+	#endif
 	
 	int a, b;
 	//cout << get_exp("@a@b@c(b=a->a=c->b=c)->@b@c(b=(0'''+0)'->(0'''+0)'=c->b=c)")->print() << endl;
@@ -244,6 +251,11 @@ int main()
 		make_something_bad(a, b);
 	}
 
-	//fclose(output);
+	#ifdef Debug
+	
+	fclose(output);
+
+	#endif
+	
 	return 0;
 }

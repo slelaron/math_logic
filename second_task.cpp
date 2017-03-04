@@ -11,11 +11,14 @@ struct operation
 	{}
 	virtual int get_id() = 0;
 	virtual size_t length() = 0;
-	virtual unsigned long long hash() = 0;
+	unsigned long long hash()
+	{
+		return get_string_hash(print());
+	}
 	virtual operation* get_copy(vector <operation*>&) = 0;
 	virtual operation* copy_yourself() = 0;
 
-	static const unsigned long long A = 3571;
+	static const unsigned long long A = 175993;
 	static const unsigned long long INF = 1000000007;
 
 	static unsigned long long get_string_hash(string that)
@@ -23,7 +26,7 @@ struct operation
 		unsigned long long hash = 0;
 		for (size_t i = 0; i < that.size(); i++)
 		{
-			hash = ((long long)hash * A + that[i]) % INF;
+			hash = ((hash * A) % INF + that[i]) % INF;
 		}
 		return hash;
 	}
@@ -66,10 +69,10 @@ struct binary_operation: operation
 	{
 		return 1 + fst->length() + snd->length();
 	}
-	virtual unsigned long long hash()
+	/*virtual unsigned long long hash()
 	{
 		return (((((get_string_hash(get_symbol()) * bin_pow(A, fst->length())) % INF + fst->hash()) % INF) * bin_pow(A, snd->length())) % INF + snd->hash()) % INF;
-	}
+	}*/
 	virtual operation* copy_yourself()
 	{
 		vector <operation*> for_copy;
@@ -190,10 +193,10 @@ struct negation: unary_operation
 	{
 		return 4;
 	}
-	unsigned long long hash()
+	/*virtual unsigned long long hash()
 	{
 		return (('!' * bin_pow(A, nxt->length())) % INF + nxt->hash()) % INF;
-	}
+	}*/
 	operation* get_copy(vector <operation*>& ops)
 	{
 		return new negation(ops[0]);
@@ -214,10 +217,10 @@ struct variable: operation
 	{
 		return name.size();
 	}
-	unsigned long long hash()
+	/*virtual unsigned long long hash()
 	{
 		return get_string_hash(name);
-	}
+	}*/
 	int get_id()
 	{
 		return 0;
@@ -269,14 +272,15 @@ struct exist: unary_operation
 	{
 		return 5;
 	}
-	unsigned long long hash()
+	/*virtual unsigned long long hash()
 	{
-		unsigned long long h = ('?' * A) % INF + '(';
+		unsigned long long h = '?';
 		h = ((h * bin_pow(A, var->length())) % INF + var->hash()) % INF;
+		h = ((h * A) % INF + '(') % INF;
 		h = ((h * bin_pow(A, nxt->length())) % INF + nxt->hash()) % INF;
 		h = ((h * A) % INF + ')') % INF;
 		return h;
-	}
+	}*/
 	operation* get_nxt(size_t what)
 	{
 		if (what == 0)
@@ -309,14 +313,15 @@ struct every: unary_operation
 	{
 		return 6;
 	}
-	unsigned long long hash()
+	/*virtual unsigned long long hash()
 	{
-		unsigned long long h = ('@' * A) % INF + '(';
-		h = ((h * bin_pow(A, var->length())) % INF + var->hash()) % INF;
-		h = ((h * bin_pow(A, nxt->length())) % INF + nxt->hash()) % INF;
+		unsigned long long h = '@';
+		cout << "Help " << var->length() << ' ' << bin_pow(A, var->length()) << endl;
+		h = (((h * bin_pow(A, var->length())) % INF) + var->hash()) % INF;
+		h = (((h * bin_pow(A, nxt->length())) % INF) + nxt->hash()) % INF;
 		h = ((h * A) % INF + ')') % INF;
 		return h;
-	}
+	}*/
 	operation* get_nxt(size_t what)
 	{
 		if (what == 0)
@@ -437,10 +442,10 @@ struct increment: unary_operation
 	{
 		return 11;
 	}
-	unsigned long long hash()
+	/*virtual unsigned long long hash()
 	{
 		return ((nxt->hash() * A) % INF + '\'') % INF;
-	}
+	}*/
 	operation* get_copy(vector <operation*>& ops)
 	{
 		return new increment(ops[0]);
@@ -481,7 +486,7 @@ struct func_predicate: operation
 		}
 		return now;
 	}
-	virtual unsigned long long hash()
+	/*virtual unsigned long long hash()
 	{
 		unsigned long long now = get_string_hash(name);
 		for (size_t i = 0; i < operations.size(); i++)
@@ -489,7 +494,7 @@ struct func_predicate: operation
 			now = ((now * bin_pow(A, operations[i]->length())) % INF + operations[i]->hash()) % INF;
 		}
 		return now;
-	}
+	}*/
 	operation* get_nxt(size_t what)
 	{
 		if (what < operations.size())
@@ -1689,15 +1694,23 @@ void get_exist()
 	in.close();
 }
 
+//#define Debug
+
 int main()
 {
 	get_every();
 	get_exist();
+
+	#ifdef Debug
 	
-	//FILE* input = freopen("11_test_input", "r", stdin);
-	//FILE* output = freopen("11_test_output", "w", stdout);
+	FILE* input = freopen("input", "r", stdin);
+	FILE* output = freopen("output", "w", stdout);
+
+	#endif
 	
 	setlocale(LC_ALL, "Russian");
+
+	//cout << get_exp("@b@a(a=b->a=c->b=c)")->hash() << ' ' << get_exp("@a@b(a=b->a=c->b=c)")->hash() << endl;
 
 	string s;
 	cin >> s;
@@ -1766,7 +1779,7 @@ int main()
 	//cerr << get_exp("@a@b@c((a=b)->((a=c)->(b=c)))")->hash() << ' ' << get_exp("@a@b@c((b=a)->((a=c)->(b=c)))")->hash() << endl;
 	//cerr << get_exp("a=b")->hash() << ' ' << get_exp("b=a")->hash() << endl;
 
-	 //get_verdict(result);
+	//get_verdict(result);
 
 	//cout << '\n';
 
@@ -1800,7 +1813,12 @@ int main()
 		delete assumption[i];
 	}
 
+	#ifdef Debug
+
 	fclose(input);
 	fclose(output);
+
+	#endif
+	
 	return 0;
 }

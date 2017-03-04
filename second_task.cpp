@@ -403,10 +403,10 @@ struct big_null: operation
 	{
 		return "0";
 	}
-	unsigned long long hash()
+	/*unsigned long long hash()
 	{
 		return 0;
-	}
+	}*/
 	size_t length()
 	{
 		return 1;
@@ -1703,8 +1703,8 @@ int main()
 
 	#ifdef Debug
 	
-	FILE* input = freopen("input", "r", stdin);
-	FILE* output = freopen("output", "w", stdout);
+	FILE* input = freopen("11_test_input", "r", stdin);
+	FILE* output = freopen("11_test_output", "w", stdout);
 
 	#endif
 	

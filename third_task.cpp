@@ -3,7 +3,7 @@
 
 using namespace std;
 
-string prelude[269];
+string prelude[273];
 string some_theorem[71];
 
 void get_prelude()
@@ -11,7 +11,7 @@ void get_prelude()
 	ifstream in;
 	in.open("another_change");
 
-	for (int i = 0; i < 269; i++)
+	for (int i = 0; i < 273; i++)
 	{
 		in >> prelude[i];
 	}
@@ -78,7 +78,7 @@ void get_evidence(const string& s, vector <string>& to_add)
 
 void make_something_good(int a, int b)
 {
-	for (int i = 0; i < 269; i++)
+	for (int i = 0; i < 273; i++)
 	{
 		cout << prelude[i] << '\n';
 	}
@@ -150,7 +150,7 @@ void make_something_good(int a, int b)
 
 void make_something_bad(int a, int b)
 {
-	for (int i = 0; i < 269; i++)
+	for (int i = 0; i < 273; i++)
 	{
 		cout << prelude[i] << '\n';
 	}

@@ -1251,7 +1251,7 @@ operation* dfs4(operation* op)
 	{
 		return sub[op->hash()]->copy_yourself();
 	}
-	else if (op->get_id() == 5 || op->get_id() == 6)
+	/*else if (op->get_id() == 5 || op->get_id() == 6)
 	{
 		if (op->get_nxt(0)->get_id() == 13 && sub.find(op->hash()) != sub.end())
 		{
@@ -1268,7 +1268,7 @@ operation* dfs4(operation* op)
 			ops.push_back(dfs4(op->get_nxt(1)));
 			return op->get_copy(ops);
 		}
-	}
+	}*/
 	else
 	{
 		vector <operation*> ops;
@@ -1684,7 +1684,7 @@ void get_exist()
 	ifstream in;
 	in.open("comment_for_exist");
 
-	for (size_t i = 0; i < 98; i++)
+	for (size_t i = 0; i < 106; i++)
 	{
 		long long a, b, c;
 		in >> a >> b >> c;
@@ -1703,8 +1703,8 @@ int main()
 
 	#ifdef Debug
 	
-	FILE* input = freopen("11_test_input", "r", stdin);
-	FILE* output = freopen("11_test_output", "w", stdout);
+	FILE* input = freopen("input", "r", stdin);
+	FILE* output = freopen("output", "w", stdout);
 
 	#endif
 	

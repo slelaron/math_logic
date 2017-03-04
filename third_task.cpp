@@ -244,6 +244,6 @@ int main()
 		make_something_bad(a, b);
 	}
 
-	fclose(output);
+	//fclose(output);
 	return 0;
 }

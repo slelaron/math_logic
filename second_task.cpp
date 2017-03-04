@@ -1694,8 +1694,8 @@ int main()
 	get_every();
 	get_exist();
 	
-	FILE* input = freopen("input", "r", stdin);
-	FILE* output = freopen("output", "w", stdout);
+	//FILE* input = freopen("11_test_input", "r", stdin);
+	//FILE* output = freopen("11_test_output", "w", stdout);
 	
 	setlocale(LC_ALL, "Russian");
 
@@ -1766,12 +1766,13 @@ int main()
 	//cerr << get_exp("@a@b@c((a=b)->((a=c)->(b=c)))")->hash() << ' ' << get_exp("@a@b@c((b=a)->((a=c)->(b=c)))")->hash() << endl;
 	//cerr << get_exp("a=b")->hash() << ' ' << get_exp("b=a")->hash() << endl;
 
-	 get_verdict(result);
+	 //get_verdict(result);
 
 	//cout << '\n';
 
 	if (what_to_do)
 	{
+		cerr << "Deduction" << endl;
 		for (int i = (int)assumption.size() - 1; i >= 0; i--)
 		{
 			//cerr << i << endl;
@@ -1779,6 +1780,7 @@ int main()
 			swap(result, result1);
 			swap(evidence, evidence1);
 		}
+		cerr << "Printing" << endl;
 		for (size_t i = 0; i < evidence.size(); i++)
 		{
 			//cerr << "Printing " << i << endl;
